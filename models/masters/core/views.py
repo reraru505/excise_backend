@@ -1,468 +1,469 @@
-from rest_framework import generics, response, status
-from masters import models as masters_model
-from masters.serializers import (licensecategory_serializer,
-                                 licensetype_serializer,
-                                 placemaster_serializer)
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status, permissions
+from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
+from rest_framework.decorators import api_view
 
-from roles.models import Role
-from roles.views import is_role_capable_of
+from auth.roles.decorators import has_app_permission
+from models import masters
+# Local app imports
+from . import models as masters_model  
 
-# LicenseCategoryAPI: For listing, creating,
-# updating, and deleting license categories
+from serializers.licensecategory_serializer import LicenseCategorySerializer 
+from serializers.licensetype_serializer import LicenseTypeSerializer
+from serializers.state_serializer import StateSerializer
+from serializers.subdivision_serializer import SubdivisionSerializer
+from serializers.district_serilizer import DistrictSerializer
+from serializers.policestation_serializer import PoliceStationSerializer
+
+from .validators import validate_name , validate_Numbers  
+
+#################################################
+#    License Category                           #
+#################################################
 
 
-class LicenseCategoryAPI(generics.ListCreateAPIView,
-                         generics.RetrieveUpdateDestroyAPIView):
-    # Fetch all license categories
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def license_category_list(request):
     queryset = masters_model.LicenseCategory.objects.all()
+    serializer = LicenseCategorySerializer(queryset, many=True)
+    return Response(serializer.data)
 
-    # Define the serializer for LicenseCategory
-    serializer_class = licensecategory_serializer.LicenseCategorySerializer
+@has_app_permission('core', 'create')
+@api_view(['POST'])
+def license_category_create(request):
+    serializer = LicenseCategorySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+ # Retrieve, Update and Delete
 
-    lookup_field = 'id'  # Define the field for lookup (by id)
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def license_category_detail(request, pk):
+    category = get_object_or_404(masters_model.LicenseCategory, pk=pk)
+    serializer = LicenseCategorySerializer(category)
+    return Response(serializer.data)
 
-    # POST request to create a new LicenseCategory
-    def post(self, request, format=None):
+@has_app_permission('core', 'update')
+@api_view(['PUT', 'PATCH'])
+def license_category_update(request, pk):
+    category = get_object_or_404(masters_model.LicenseCategory, pk=pk)
+    serializer = LicenseCategorySerializer(category, data=request.data, partial=request.method == 'PATCH')
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
+@has_app_permission('core', 'delete')
+@api_view(['DELETE'])
+def license_category_delete(request, pk):
+    category = get_object_or_404(masters_model.LicenseCategory, pk=pk)
+    category.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
-        serializer = licensecategory_serializer.LicenseCategorySerializer(
-            data=request.data)
 
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data,
-                                     status=status.HTTP_201_CREATED)
 
-        return response.Response(serializer.errors,
-                                 status=status.HTTP_400_BAD_REQUEST)
+#################################################
+#    License Type                               #
+#################################################
+ 
 
-    # GET request for retrieving one or more LicenseCategories
-    def get(self, request, id=None, format=None):
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def license_type_list(request):
+    queryset = masters_model.LicenseType.objects.all()
+    serializer = LicenseTypeSerializer(queryset, many=True)
+    return Response(serializer.data)
 
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
+@has_app_permission('core', 'create')
+@api_view(['POST'])
+def license_type_create(request):
+    serializer = LicenseTypeSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
 
-        if id:
-            # Fetch a specific LicenseCategory by id
-            license_category = masters_model.LicenseCategory.objects.get(id=id)
-            serializer = licensecategory_serializer.LicenseCategorySerializer(
-                license_category)
-            return response.Response(serializer.data,
-                                     status=status.HTTP_200_OK)
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def license_type_detail(request, pk):
+    license_type = get_object_or_404(masters_model.LicenseType, pk=pk)
+    serializer = LicenseTypeSerializer(license_type)
+    return Response(serializer.data)
 
-        # Fetch all LicenseCategories if no specific id provided
+@has_app_permission('core', 'update')
+@api_view(['PUT', 'PATCH'])
+def license_type_update(request, pk):
+    license_type = get_object_or_404(masters_model.LicenseType, pk=pk)
+    serializer = LicenseTypeSerializer(license_type, data=request.data, partial=request.method == 'PATCH')
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
 
-        license_categories = masters_model.LicenseCategory.objects.all()
-        serializer = licensecategory_serializer.LicenseCategorySerializer(
-            license_categories,
-            many=True
+@has_app_permission('core', 'delete')
+@api_view(['DELETE'])
+def license_type_delete(request, pk):
+    license_type = get_object_or_404(masters_model.LicenseType, pk=pk)
+    license_type.delete()
+    return Response(status=204)
+
+
+
+
+
+#################################################
+#    State                                      #
+#################################################
+
+ # List all states (GET)
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def state_list(request):
+    queryset = masters_model.State.objects.filter(IsActive=True)
+    serializer = StateSerializer(queryset, many=True, context={'request': request})
+    return Response({
+        'count': queryset.count(),
+        'results': serializer.data
+    })
+
+# Create new state (POST)
+@has_app_permission('core', 'create')
+@api_view(['POST'])
+def state_create(request):
+    serializer = StateSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+# Get single state (GET)
+@has_app_permission('core', 'view')
+@api_view(['GET'])
+def state_detail(request, state_code):
+    state = get_object_or_404(masters_model.State, StateCode=state_code, IsActive=True)
+    serializer = StateSerializer(state, context={'request': request})
+    return Response(serializer.data)
+
+# Full update (PUT)
+@has_app_permission('core', 'update')
+@api_view(['PUT'])
+def state_update(request, state_code):
+    state = get_object_or_404(masters_model.State, StateCode=state_code)
+    serializer = StateSerializer(
+        instance=state, 
+        data=request.data, 
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+# Partial update (PATCH)
+@has_app_permission('core', 'update')
+@api_view(['PATCH'])
+def state_partial_update(request, state_code):
+    state = get_object_or_404(masters_model.State, StateCode=state_code)
+    serializer = StateSerializer(
+        instance=state,
+        data=request.data,
+        partial=True,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+# Deactivate state (DELETE)
+@has_app_permission('core', 'delete')
+@api_view(['DELETE'])
+def state_delete(request, state_code):
+    state = get_object_or_404(masters_model.State, StateCode=state_code)
+    state.IsActive = False  # Soft delete
+    state.save()
+    return Response(
+        {'message': f'State {state.State} deactivated'},
+        status=status.HTTP_200_OK
+    )
+
+
+
+ 
+#################################################
+#    Subdivision                                #
+#################################################
+ 
+ # List all active subdivisions (with district filter)
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def subdivision_list(request):
+    district_code = request.query_params.get('district_code')
+    queryset = masters_model.Subdivision.objects.filter(IsActive=True)
+    
+    if district_code:
+        queryset = queryset.filter(DistrictCode=district_code)
+    
+    serializer = SubdivisionSerializer(
+        queryset, 
+        many=True,
+        context={'request': request}
+    )
+    return Response({
+        'count': queryset.count(),
+        'results': serializer.data
+    })
+
+# Create new subdivision
+@has_app_permission('masters', 'create')
+@api_view(['POST'])
+def subdivision_create(request):
+    serializer = SubdivisionSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+# Get subdivision detail
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def subdivision_detail(request, subdivision_code):
+    subdivision = get_object_or_404(
+        masters_model.Subdivision, 
+        SubDivisionCode=subdivision_code,
+        IsActive=True
+    )
+    serializer = SubdivisionSerializer(
+        subdivision,
+        context={'request': request}
+    )
+    return Response(serializer.data)
+
+# Full update
+@has_app_permission('masters', 'update')
+@api_view(['PUT'])
+def subdivision_update(request, subdivision_code):
+    subdivision = get_object_or_404(masters_model.Subdivision, SubDivisionCode=subdivision_code)
+    serializer = SubdivisionSerializer(
+        instance=subdivision,
+        data=request.data,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+# Partial update
+@has_app_permission('masters', 'update')
+@api_view(['PATCH'])
+def subdivision_partial_update(request, subdivision_code):
+    subdivision = get_object_or_404(masters_model.Subdivision, SubDivisionCode=subdivision_code)
+    serializer = SubdivisionSerializer(
+        instance=subdivision,
+        data=request.data,
+        partial=True,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+@has_app_permission('masters', 'delete')
+@api_view(['DELETE'])
+def subdivision_delete(request, subdivision_code):
+    subdivision = get_object_or_404(masters_model.Subdivision, SubDivisionCode=subdivision_code)
+    
+    # Safe check using getattr
+    if getattr(subdivision, 'police_stations', None) and subdivision.police_stations.exists():
+        return Response(
+            {"error": "Cannot delete subdivision with police stations"},
+            status=status.HTTP_400_BAD_REQUEST
         )
+    
+    subdivision.IsActive = False
+    subdivision.save()
+    return Response(
+        {"message": f"Subdivision {subdivision.SubDivisionName} deactivated"},
+        status=status.HTTP_200_OK
+    )
+
+
+
+ 
+#################################################
+#    District                                   #
+#################################################
+ 
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def district_list(request):
+    state_code = request.query_params.get('state_code')
+    queryset = masters_model.District.objects.filter(IsActive=True)
+    
+    if state_code:
+        queryset = queryset.filter(StateCode=state_code)
+    
+    serializer = DistrictSerializer(
+        queryset, 
+        many=True,
+        context={'request': request}
+    )
+    return Response({
+        'count': queryset.count(),
+        'results': serializer.data
+    })
+
+@has_app_permission('masters', 'create')
+@api_view(['POST'])
+def district_create(request):
+    serializer = DistrictSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def district_detail(request, district_code):
+    district = get_object_or_404(
+        masters_model.District, 
+        DistrictCode=district_code,
+        IsActive=True
+    )
+    serializer = DistrictSerializer(
+        district,
+        context={'request': request}
+    )
+    return Response(serializer.data)
+
+@has_app_permission('masters', 'update')
+@api_view(['PUT', 'PATCH'])
+def district_update(request, district_code):
+    district = get_object_or_404(masters_model.District, DistrictCode=district_code)
+    partial = request.method == 'PATCH'
+    
+    serializer = DistrictSerializer(
+        instance=district,
+        data=request.data,
+        partial=partial,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+@has_app_permission('masters', 'delete')
+@api_view(['DELETE'])
+def district_delete(request, district_code):
+    district = get_object_or_404(masters_model.District, DistrictCode=district_code)
+    
+    if district.subdivisions.exists():
+        return Response(
+            {"error": "Cannot delete district with subdivisions"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    district.IsActive = False
+    district.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def policestation_list(request):
+    subdivision_code = request.query_params.get('subdivision_code')
+    queryset = masters_model.PoliceStation.objects.filter(IsActive=True)
+    
+    if subdivision_code:
+        queryset = queryset.filter(SubDivisionCode=subdivision_code)
+    
+    serializer = PoliceStationSerializer(
+        queryset,
+        many=True,
+        context={'request': request}
+    )
+    return Response({
+        'count': queryset.count(),
+        'results': serializer.data
+    })
 
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    # PUT request for updating a LicenseCategory
-    def put(self, request, id, format=None):
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        license_category = masters_model.LicenseCategory.objects.get(id=id)
-        serializer = licensecategory_serializer.LicenseCategorySerializer(
-            license_category, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data,
-                                     status=status.HTTP_200_OK)
-
-        return response.Response(serializer.errors,
-                                 status=status.HTTP_400_BAD_REQUEST)
-
-    # DELETE request to remove a LicenseCategory
-    def delete(self, request, id, format=None):
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            license_category = masters_model.LicenseCategory.objects.get(id=id)
-            license_category.delete()
-            return response.Response(status=status.HTTP_204_NO_CONTENT)
-        except masters_model.LicenseCategory.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-# LicenseTypeAPI: For listing, creating, updating, and deleting license types
-
-
-class LicenseTypeAPI(generics.ListCreateAPIView,
-                     generics.RetrieveUpdateDestroyAPIView):
-
-    queryset = masters_model.LicenseType.objects.all()  # Fetch all license types
-    # Define the serializer for LicenseType
-    serializer_class = licensetype_serializer.LicenseTypeSerializer
-    lookup_field = 'id'  # Define the field for lookup (by id)
-
-    # POST request to create a new LicenseType
-    def post(self, request, format=None):
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = licensetype_serializer.LicenseTypeSerializer(
-            data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data, status=status.HTTP_201_CREATED)
-        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def get(self, request, id=None, format=None):
-        # GET request for retrieving one or more LicenseTypes
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        if id:
-            try:
-                # Fetch a specific LicenseType by id
-                license_type = masters_model.LicenseType.objects.get(id=id)
-                serializer = self.serializer_class(license_type)
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            except masters_model.LicenseType.DoesNotExist:
-                return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        # Fetch all LicenseTypes if no specific id provided
-        license_types = masters_model.LicenseType.objects.all()
-        serializer = self.serializer_class(license_types, many=True)
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, id, format=None):
-        # PUT request for updating a LicenseType
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            license_type = masters_model.LicenseType.objects.get(id=id)
-            serializer = self.serializer_class(
-                license_type, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except masters_model.LicenseType.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-    def delete(self, request, id, format=None):
-        # DELETE request to remove a LicenseType
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            license_type = masters_model.LicenseType.objects.get(id=id)
-            license_type.delete()
-            return response.Response(status=status.HTTP_204_NO_CONTENT)
-        except masters_model.LicenseType.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-# SubDivisonAPI: For creating, retrieving, updating, and deleting subdivisions
-
-
-class SubDivisonApi(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
-    queryset = masters_model.Subdivision.objects.all()  # Fetch all subdivisions
-    # Define the serializer for Subdivision
-    serializer_class = placemaster_serializer.SubDivisonSerializer
-    lookup_field = 'id'  # Define the field for lookup (by id)
-
-    def post(self, request, format=None):
-        # POST request to create a new Subdivision
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = placemaster_serializer.SubDivisonSerializer(
-            data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data, status=status.HTTP_201_CREATED)
-        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def get(self, request, id=None, dc=None, format=None):
-        # GET request for retrieving subdivisions based on various parameters
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        if id:
-            try:
-                # Fetch a specific Subdivision by id
-                subdivision = masters_model.Subdivision.objects.get(id=id)
-                serializer = self.serializer_class(subdivision)
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            except masters_model.Subdivision.DoesNotExist:
-                return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        if dc is not None:  # Fetch by district code
-            subdivisions = masters_model.Subdivision.objects.filter(
-                DistrictCode=dc)
-            if not subdivisions.exists():
-                raise NotFound(
-                    detail="No subdivisions found for this district code",
-                    code=status.HTTP_404_NOT_FOUND)
-            serializer = self.serializer_class(subdivisions, many=True)
-            return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-        # Fetch all subdivisions if no id or district code provided
-        subdivisions = masters_model.Subdivision.objects.all()
-        serializer = self.serializer_class(subdivisions, many=True)
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, id, format=None):
-        # PUT request for updating a Subdivision
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            subdivision = masters_model.Subdivision.objects.get(id=id)
-            serializer = self.serializer_class(
-                subdivision, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except masters_model.Subdivision.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-    def delete(self, request, id, format=None):
-        # DELETE request to remove a Subdivision
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            subdivision = masters_model.Subdivision.objects.get(id=id)
-            subdivision.delete()
-            return response.Response(status=status.HTTP_204_NO_CONTENT)
-        except masters_model.Subdivision.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-# DistrictAPI: For listing, creating, updating, and deleting districts
-
-
-class DistrictAPI(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
-    queryset = masters_model.District.objects.all()  # Fetch all districts
-    # Define the serializer for District
-    serializer_class = placemaster_serializer.DistrictSerializer
-    lookup_field = 'id'  # Define the field for lookup (by id)
-
-    def post(self, request, format=None):
-        # POST request to create a new District
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data, status=status.HTTP_201_CREATED)
-        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def get(self, request, id=None, format=None):
-        # GET request for retrieving one or more Districts
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        if id:
-            try:
-                # Fetch a specific District by id
-                district = masters_model.District.objects.get(id=id)
-                serializer = self.serializer_class(district)
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            except masters_model.District.DoesNotExist:
-                return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-        # Fetch all Districts if no specific id provided
-        districts = masters_model.District.objects.all()
-        serializer = self.serializer_class(districts, many=True)
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, id, format=None):
-        # PUT request for updating a District
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            district = masters_model.District.objects.get(id=id)
-            serializer = self.serializer_class(
-                district, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return response.Response(serializer.data, status=status.HTTP_200_OK)
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except masters_model.District.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-    def delete(self, request, id, format=None):
-        # DELETE request to remove a District
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            district = masters_model.District.objects.get(id=id)
-            district.delete()
-            return response.Response(status=status.HTTP_204_NO_CONTENT)
-        except masters_model.District.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-
-# PoliceStationAPI: For listing, creating, updating, and deleting police stations
-
-
-class PoliceStationAPI(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
-    queryset = masters_model.PoliceStation.objects.all()  # Fetch all police stations
-    # Define the serializer for PoliceStation
-    serializer_class = placemaster_serializer.PoliceStationSerializer
-    lookup_field = 'id'  # Define the field for lookup (by id)
-
-    def post(self, request, format=None):
-        # POST request to create a new PoliceStation
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        serializer = placemaster_serializer.PoliceStationSerializer(
-            data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data, status=status.HTTP_201_CREATED)
-        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def get(self, request, id=None, format=None):
-        # GET request for retrieving one or more PoliceStations
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        if id:
-            # Fetch a specific PoliceStation by id
-            policestation = masters_model.PoliceStation.objects.get(id=id)
-            serializer = placemaster_serializer.PoliceStationSerializer(
-                policestation)
-            return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-        # Fetch all PoliceStations if no specific id provided
-        police_stations = masters_model.PoliceStation.objects.all()
-        serializer = placemaster_serializer.PoliceStationSerializer(
-            police_stations, many=True)
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, id, format=None):
-        # PUT request for updating a PoliceStation
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        policestation = masters_model.PoliceStation.objects.get(id=id)
-        serializer = placemaster_serializer.PoliceStationSerializer(
-            policestation, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return response.Response(serializer.data, status=status.HTTP_200_OK)
-        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, id, format=None):
-        # DELETE request to remove a PoliceStation
-
-        if is_role_capable_of(
-            request=request,
-            operation=Role.READ_WRITE,
-            model='masters'
-        ) is False:
-            return response.Response(status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            policestation = masters_model.PoliceStation.objects.get(id=id)
-            policestation.delete()
-            return response.Response(status=status.HTTP_205_RESET_CONTENT)
-        except masters_model.PoliceStation.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
+@has_app_permission('masters', 'create')
+@api_view(['POST'])
+def policestation_create(request):
+    serializer = PoliceStationSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@has_app_permission('masters', 'view')
+@api_view(['GET'])
+def policestation_detail(request, policestation_code):
+    station = get_object_or_404(
+        masters_model.PoliceStation, 
+        PoliceStationCode=policestation_code,
+        IsActive=True
+    )
+    serializer = PoliceStationSerializer(
+        station,
+        context={'request': request}
+    )
+    return Response(serializer.data)
+
+@has_app_permission('masters', 'update')
+@api_view(['PUT', 'PATCH'])
+def policestation_update(request, policestation_code):
+    station = get_object_or_404(masters_model.PoliceStation, PoliceStationCode=policestation_code)
+    partial = request.method == 'PATCH'
+    
+    serializer = PoliceStationSerializer(
+        instance=station,
+        data=request.data,
+        partial=partial,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+@has_app_permission('masters', 'delete')
+@api_view(['DELETE'])
+def policestation_delete(request, policestation_code):
+    station = get_object_or_404(masters_model.PoliceStation, PoliceStationCode=policestation_code)
+    station.IsActive = False
+    station.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

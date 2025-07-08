@@ -1,32 +1,27 @@
 from django.db import models
-from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
-from django.utils import timezone 
-
-
-from auth.user.validators import validate_name , validate_phone_number
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.core.validators import validate_email
+from django.db.models.functions import Abs
+from auth.user.validators import validate_name, validate_phone_number
 from auth.roles.models import Role
-
 import random
 
-
-class CustomUserManager():
-    def create_user(
-        self,
-        email,
-        first_name,
-        last_name,
-        phone_number ,
-
-        district,
-        subdivision,
-        address,
-        created_by,
-
-        password=None
-    ):
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, first_name, last_name, phone_number,
+                   district, subdivision, address, password=None, **extra_fields):
+        """
+        Creates and saves a User with the given required fields
+        """
         if not email:
-            raise ValueError('The Email field must be set')
+            raise ValueError('The Email must be set')
+        if not first_name:
+            raise ValueError('First name must be set')
+        if not last_name:
+            raise ValueError('Last name must be set')
+        if not phone_number:
+            raise ValueError('Phone number must be set')
 
+        email = self.normalize_email(email)
         username = self.generate_unique_username(
             first_name=first_name,
             last_name=last_name,
@@ -34,66 +29,94 @@ class CustomUserManager():
             district=district,
             subdivision=subdivision
         )
-
-        user_handle = self.model(
+        
+        user = self.model(
             email=email,
+            username=username,
             first_name=first_name,
             last_name=last_name,
             phone_number=phone_number,
             district=district,
             subdivision=subdivision,
-            address=address,                      
+            address=address,
+            **extra_fields
         )
-        user_handle.set_password(password)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
 
-        user_handle.save()
-        return user_handle
-
-    
-    def generate_unique_username(self,
-                                 first_name,
-                                 last_name,
-                                 phone_number,
-                                 district,
-                                 subdivision):
-
-        initials = first_name[0].upper() + last_name[0].upper()
-        base_username = f"{initials}{phone_number[-4:]}{district}{subdivision}"
-        username = base_username[:10]
+    def generate_unique_username(self, first_name, last_name, phone_number, district, subdivision):
+        initials = f"{first_name[0].upper()}{last_name[0].upper()}"
+        base = f"{initials}{phone_number[-4:]}{district}{subdivision}"
+        username = base[:10]
+        
         while self.model.objects.filter(username=username).exists():
-            username = f"{base_username[:7]}{random.randint(100, 999)}"
+            username = f"{base[:7]}{random.randint(100, 999)}"
         return username
 
-    
-
-
 class CustomUser(AbstractBaseUser):
-
-    class Meta :
-        db_table = 'custom_user'
-
-    email = models.EmailField(unique=True)
-
-    first_name = models.CharField( max_length=50,
-                                   null = False,
-                                   validators=[validate_name])
-    last_name  = models.CharField( max_length=50,
-                                   null=False,
-                                   validators=[validate_name])
-
-    phone_number = models.CharField( max_length=10,
-                                     unique=True,
-                                     validators=[validate_phone_number])
-
-    district = models.BigIntegerField(default=117)
-
-    subdivision = models.IntegerField(default=1001)
-    address = models.CharField(max_length=70, null=True)
+    email = models.EmailField(
+        unique=True,
+        validators=[validate_email],
+        error_messages={
+            'unique': "A user with that email already exists.",
+        }
+    )
+    username = models.CharField(
+        max_length=30,
+        unique=True,
+        blank=True  # Will be auto-generated
+    )
+    first_name = models.CharField(
+        max_length=50,
+        validators=[validate_name],
+        error_messages={
+            'blank': "First name cannot be blank.",
+        }
+    )
+    last_name = models.CharField(
+        max_length=50,
+        validators=[validate_name],
+        error_messages={
+            'blank': "Last name cannot be blank.",
+        }
+    )
+    phone_number = models.CharField(
+        max_length=10,
+        unique=True,
+        validators=[validate_phone_number],
+        error_messages={
+            'unique': "A user with that phone number already exists.",
+        }
+    )
+    district = models.PositiveIntegerField(default=117)# pyright: ignore [reportArgumentType, reportGeneralTypeIssues] 
+    subdivision = models.PositiveIntegerField(default=1001)# pyright: ignore [reportArgumentType, reportGeneralTypeIssues]
+    address = models.CharField(max_length=70, blank=True, null=True)
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users'
+    )
+    is_active = models.BooleanField(default=True)# pyright: ignore [reportArgumentType, reportGeneralTypeIssues]
+    date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = CustomUserManager()
 
-    role = models.ForeignKey(to=Role.role_id , on_delete=models.SET_NULL , null=True)
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'phone_number']
+
+    class Meta:
+        db_table = 'custom_user'
+        verbose_name = 'user'
+        verbose_name_plural = 'users'
+        ordering = ['-date_joined']
+
 
     def __str__(self):
-        return self.username
-    
+        return self.username or self.email
+
+    def clean(self):
+        super().clean()
+        self.email = self.__class__.objects.normalize_email(self.email)

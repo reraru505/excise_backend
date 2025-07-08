@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     #########################
     # User defined packages #
     #########################
-
+    
     # masters models
 
     'models.masters.core',
@@ -67,6 +67,11 @@ INSTALLED_APPS = [
     'models.masters.contact_us',
     'models.masters.license_application',
     'models.masters.salesman_barman',
+
+    # auth models 
+
+    'auth.roles',
+    'auth.user',
 ]
 
 MIDDLEWARE = [
